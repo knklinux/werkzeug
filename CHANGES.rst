@@ -3,6 +3,10 @@
 Version 3.2.0
 -------------
 
+-   :func:`dump_cookie` raises ``ValueError`` when a ``__Secure-`` or
+    ``__Host-`` prefixed cookie name is combined with attributes that user
+    agents reject (RFC 6265bis section 4.1.3). Previously the header was
+    emitted and the browser silently dropped the cookie.
 -   Drop support for Python 3.9 and 3.10. :pr:`3098`
 -   Remove previous deprecated code: :pr:`3099`
 

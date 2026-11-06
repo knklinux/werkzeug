@@ -1413,6 +1413,10 @@ def dump_cookie(
     :param key: The cookie key. This is assumed to be trusted and valid, it
         must not come from untrusted user input. Should only contain ASCII.
         Non-ASCII is double-encoded as UTF-8 then Latin-1 to match browsers.
+
+        A name prefixed with ``__Secure-`` or ``__Host-`` must also satisfy the
+        attribute requirements of RFC 6265bis section 4.1.3, otherwise
+        :exc:`ValueError` is raised.
     :param value: The cookie value. Should only contain ASCII. Non-ASCII is
         escaped as ``\\123`` octal sequences.
     :param max_age: The client will discard the cookie after this duration. An
@@ -1439,6 +1443,10 @@ def dump_cookie(
         also sets ``secure`` to ``True``
 
     .. _`cookie`: http://browsercookielimits.squawky.net/
+
+    .. versionchanged:: 3.2
+        Raise ``ValueError`` if a ``__Secure-`` or ``__Host-`` prefixed name is
+        combined with attributes that make user agents ignore the cookie.
 
     .. versionchanged:: 3.1
         The ``partitioned`` parameter was added.
@@ -1487,6 +1495,24 @@ def dump_cookie(
 
     if partitioned:
         secure = True
+
+    # RFC 6265bis section 4.1.3 makes the "__Secure-" and "__Host-" name
+    # prefixes conditional on the cookie's attributes. A user agent that gets
+    # an attribute combination violating them ignores the cookie entirely, so
+    # the application silently ships a cookie that is never stored. Refuse to
+    # build such a header here instead of failing at the browser.
+    if key.startswith("__Secure-") and not secure:
+        raise ValueError(f"Cookie name {key!r} requires Secure=True.")
+
+    if key.startswith("__Host-"):
+        if not secure:
+            raise ValueError(f"Cookie name {key!r} requires Secure=True.")
+
+        if domain is not None:
+            raise ValueError(f"Cookie name {key!r} requires Domain=None.")
+
+        if path != "/":
+            raise ValueError(f"Cookie name {key!r} requires Path='/'.")
 
     # Quote value if it contains characters not allowed by RFC 6265. Slash-escape with
     # three octal digits, which matches http.cookies, although the RFC suggests base64.
